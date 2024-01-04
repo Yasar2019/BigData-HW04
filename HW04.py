@@ -20,10 +20,16 @@ def main():
             "spark.hadoop.home.dir",
             "C:/Users/Asus/Downloads/spark-3.5.0-bin-hadoop3/spark-3.5.0-bin-hadoop3/bin",
         )
-        .config("spark.driver.memory", "8g")
+        .config("spark.driver.memory", "4g")
         .config("spark.executor.memory", "14g")
         .config("spark.memory.fraction", "0.8")
         .config("spark.memory.storageFraction", "0.5")
+        .config(
+            "spark.executor.extraJavaOptions", "-XX:+UseG1GC"
+        )  # Using G1 Garbage Collector
+        .config(
+            "spark.driver.extraJavaOptions", "-XX:+UseG1GC"
+        )  # Using G1 Garbage Collector for driver
         .getOrCreate()
     )
     sc = spark.sparkContext
@@ -124,37 +130,24 @@ def main():
     )
     model = als.fit(ratings)
 
-    # Normalize each user feature vector
-    norm_udf = udf(
-        lambda v: Vectors.dense(v) / Vectors.norm(Vectors.dense(v), 2), VectorUDT()
+    userRecs = model.recommendForAllUsers(
+        10
+    )  # Get top 10 recommendations for all users
+    userRecs = userRecs.withColumn("rec_exp", explode("recommendations")).select(
+        "UserID", "rec_exp.MovieID", "rec_exp.rating"
     )
-    userFactors = model.userFactors.withColumn("normFeatures", norm_udf("features"))
+    userRecs.show()
 
-    # Define a UDF to compute cosine similarity between two vectors
-    def cosine_similarity(a, b):
-        return float(a.dot(b) / (Vectors.norm(a, 2) * Vectors.norm(b, 2)))
+    # TASK 5
 
-    cosine_similarity_udf = udf(cosine_similarity, FloatType())
-
-    # Compute pairwise similarities (For all combinations of user pairs)
-    # Note: This is computationally expensive and typically not advisable for very large datasets
-    pairs = (
-        userFactors.alias("u1")
-        .crossJoin(userFactors.alias("u2"))
-        .filter(col("u1.id") < col("u2.id"))  # to avoid duplicate pairs
-        .select(
-            col("u1.id").alias("user1"),
-            col("u2.id").alias("user2"),
-            cosine_similarity_udf("u1.normFeatures", "u2.normFeatures").alias(
-                "similarity"
-            ),
-        )
+    movieRecs = model.recommendForAllItems(
+        10
+    )  # Get top 10 recommendations for all items
+    movieRecs = movieRecs.withColumn("rec_exp", explode("recommendations")).select(
+        "MovieID", "rec_exp.UserID", "rec_exp.rating"
     )
+    movieRecs.show()
 
-    # Collect and save results
-    pairs.orderBy(col("similarity").desc()).toPandas().to_csv(
-        "output/task4_user_cosine_similarity.csv", index=False
-    )
     # Stop Spark session
     spark.stop()
 

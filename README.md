@@ -25,8 +25,9 @@ OpenJDK 64-Bit Server VM Temurin-17.0.1+12 (build 17.0.1+12, mixed mode, sharing
 #### You can find all the output files (Task #1,2,3) in the folder named "output"
 * **Output files:** [output](output)
 * **Output files format:** csv
-![Alt text](task#4.png)
-![Alt text](task#5.png)
+* ![Alt text](task%234.png)
+* ![Alt text](task%234.png)
+
 #### 1.4. Code
 * **Code:** [HW04.py](HW04.py)
 
